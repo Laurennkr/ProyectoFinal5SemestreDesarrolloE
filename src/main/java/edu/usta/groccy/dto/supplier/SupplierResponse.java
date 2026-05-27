@@ -11,3 +11,6 @@ public record SupplierResponse(
         Status status
 ) {
 }
+
+
+//Para proveedores

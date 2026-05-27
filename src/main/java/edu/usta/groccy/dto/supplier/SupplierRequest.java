@@ -13,3 +13,6 @@ public record SupplierRequest(
         String address
 ) {
 }
+
+
+//Para proveedores
