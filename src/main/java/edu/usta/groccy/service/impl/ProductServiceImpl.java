@@ -11,7 +11,7 @@ import edu.usta.groccy.repository.ProductRepository;
 import edu.usta.groccy.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
+import edu.usta.groccy.enums.Status;
 import java.util.List;
 
 @Service
@@ -35,7 +35,9 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public List<ProductResponse> findAll() {
-        return productMapper.toResponseList(productRepository.findAll());
+        return productMapper.toResponseList(
+                productRepository.findAllByStatus(Status.ACTIVE)
+        );
     }
 
     @Override
