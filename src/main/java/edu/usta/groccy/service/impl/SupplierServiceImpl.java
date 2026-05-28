@@ -11,7 +11,7 @@ import edu.usta.groccy.repository.SupplierRepository;
 import edu.usta.groccy.service.SupplierService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
+import edu.usta.groccy.enums.Status;
 import java.util.List;
 
 @Service
@@ -35,9 +35,11 @@ public class SupplierServiceImpl implements SupplierService {
 
     @Override
     public List<SupplierResponse> findAll() {
-        return supplierMapper.toResponseList(supplierRepository.findAll());
-    }
+        return supplierMapper.toResponseList(
+                supplierRepository.findAllByStatus(Status.ACTIVE)
+        );
 
+    }
     @Override
     public SupplierResponse findById(Long id) {
         Supplier supplier = findSupplierById(id);

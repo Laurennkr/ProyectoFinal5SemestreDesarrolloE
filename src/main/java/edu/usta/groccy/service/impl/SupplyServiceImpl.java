@@ -13,7 +13,7 @@ import edu.usta.groccy.repository.SupplierRepository;
 import edu.usta.groccy.service.SupplyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
+import edu.usta.groccy.enums.Status;
 import java.util.List;
 
 @Service
@@ -53,6 +53,7 @@ public class SupplyServiceImpl implements SupplyService {
         return supplyMapper.toResponseList(
                 supplyRepository.findAllByStatus(Status.ACTIVE));
     }
+
 
     @Override
     public SupplyResponse findById(Long id) {

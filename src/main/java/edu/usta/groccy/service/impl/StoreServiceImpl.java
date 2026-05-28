@@ -10,6 +10,7 @@ import edu.usta.groccy.repository.StoreRepository;
 import edu.usta.groccy.service.StoreService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import edu.usta.groccy.enums.Status;
 
 import java.util.List;
 
@@ -30,9 +31,10 @@ public class StoreServiceImpl implements StoreService {
 
     @Override
     public List<StoreResponse> findAll() {
-        return storeMapper.toResponseList(storeRepository.findAll());
+        return storeMapper.toResponseList(
+                storeRepository.findAllByStatus(Status.ACTIVE)
+        );
     }
-
     @Override
     public StoreResponse findById(Long id) {
         Store store = findStoreById(id);
