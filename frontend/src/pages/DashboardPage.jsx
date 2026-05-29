@@ -1,13 +1,32 @@
 import { useEffect, useMemo, useState } from "react";
 import apiClient from "../api/apiClient";
+
+import DashboardLayout from "../components/dashboard/DashboardLayout";
+
+import SuppliersModule from "../modules/SuppliersModule";
+import ProductsModule from "../modules/ProductsModule";
+import StoresModule from "../modules/StoresModule";
+import SuppliesModule from "../modules/SuppliesModule";
+import SalesModule from "../modules/SalesModule";
+import AlertsModule from "../modules/AlertsModule";
+import ProductionModule from "../modules/ProductionModule";
+import StockModule from "../modules/StockModule";
+
 import "../styles/dashboard.css";
 
 function DashboardPage({ user, onLogout }) {
   const [activeSection, setActiveSection] = useState("dashboard");
+
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
   const [stores, setStores] = useState([]);
+  const [supplies, setSupplies] = useState([]);
+  const [sales, setSales] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [productionSheets, setProductionSheets] = useState([]);
+
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const normalizedRole = useMemo(() => {
     return user?.role?.replace("ROLE_", "") || "";
@@ -17,50 +36,28 @@ function DashboardPage({ user, onLogout }) {
   const isSeller = normalizedRole === "SELLER";
   const isTailor = normalizedRole === "TAILOR";
 
+  const userId = user?.userId || user?.id;
+
   const canViewSuppliers = isAdmin;
   const canViewProducts = isAdmin || isSeller || isTailor;
   const canViewStores = isAdmin || isSeller;
+  const canViewSupplies = isAdmin || isTailor;
+  const canViewStock = isAdmin || isSeller;
   const canViewSales = isAdmin || isSeller;
   const canViewProduction = isAdmin || isTailor;
   const canViewAlerts = isAdmin;
 
   const menuItems = useMemo(() => {
     const items = [
-      {
-        key: "dashboard",
-        label: "Panel principal",
-        visible: true,
-      },
-      {
-        key: "suppliers",
-        label: "Proveedores",
-        visible: canViewSuppliers,
-      },
-      {
-        key: "products",
-        label: "Productos",
-        visible: canViewProducts,
-      },
-      {
-        key: "stores",
-        label: "Locales",
-        visible: canViewStores,
-      },
-      {
-        key: "sales",
-        label: "Ventas",
-        visible: canViewSales,
-      },
-      {
-        key: "production",
-        label: "Producción",
-        visible: canViewProduction,
-      },
-      {
-        key: "alerts",
-        label: "Alertas",
-        visible: canViewAlerts,
-      },
+      { key: "dashboard", label: "Panel principal", visible: true },
+      { key: "suppliers", label: "Proveedores", visible: canViewSuppliers },
+      { key: "products", label: "Productos", visible: canViewProducts },
+      { key: "stores", label: "Locales", visible: canViewStores },
+      { key: "supplies", label: "Insumos", visible: canViewSupplies },
+      { key: "stock", label: "Stock", visible: canViewStock },
+      { key: "sales", label: "Ventas", visible: canViewSales },
+      { key: "production", label: "Producción", visible: canViewProduction },
+      { key: "alerts", label: "Alertas", visible: canViewAlerts },
     ];
 
     return items.filter((item) => item.visible);
@@ -68,46 +65,90 @@ function DashboardPage({ user, onLogout }) {
     canViewSuppliers,
     canViewProducts,
     canViewStores,
+    canViewSupplies,
+    canViewStock,
     canViewSales,
     canViewProduction,
     canViewAlerts,
   ]);
 
   useEffect(() => {
-    const sectionIsAllowed = menuItems.some((item) => item.key === activeSection);
+    const isAllowed = menuItems.some((item) => item.key === activeSection);
 
-    if (!sectionIsAllowed) {
+    if (!isAllowed) {
       setActiveSection("dashboard");
     }
   }, [activeSection, menuItems]);
+
+  const normalizeResponse = (response) => {
+    return response.data?.data ?? response.data ?? [];
+  };
 
   const loadData = async () => {
     setError("");
 
     try {
       if (canViewSuppliers) {
-        const suppliersResponse = await apiClient.get("/proveedores");
-        setSuppliers(suppliersResponse.data?.data ?? suppliersResponse.data ?? []);
+        const response = await apiClient.get("/proveedores");
+        setSuppliers(normalizeResponse(response));
       } else {
         setSuppliers([]);
       }
 
-      if (canViewProducts) {
-        const productsResponse = await apiClient.get("/productos");
-        setProducts(productsResponse.data?.data ?? productsResponse.data ?? []);
+      if (canViewProducts || canViewSales || canViewStock || canViewProduction) {
+        const response = await apiClient.get("/productos");
+        setProducts(normalizeResponse(response));
       } else {
         setProducts([]);
       }
 
-      if (canViewStores) {
-        const storesResponse = await apiClient.get("/locales");
-        setStores(storesResponse.data?.data ?? storesResponse.data ?? []);
+      if (canViewStores || canViewSales || canViewStock) {
+        const response = await apiClient.get("/locales");
+        setStores(normalizeResponse(response));
       } else {
         setStores([]);
       }
+
+      if (canViewSupplies || canViewProduction) {
+        const response = await apiClient.get("/insumos");
+        setSupplies(normalizeResponse(response));
+      } else {
+        setSupplies([]);
+      }
+
+      if (canViewSales) {
+        const response = await apiClient.get("/ventas");
+        setSales(normalizeResponse(response));
+      } else {
+        setSales([]);
+      }
+
+      if (canViewAlerts) {
+        const response = await apiClient.get("/alertas");
+        setAlerts(normalizeResponse(response));
+      } else {
+        setAlerts([]);
+      }
+
+      if (canViewProduction) {
+        if (isAdmin) {
+          const response = await apiClient.get("/fichas-produccion");
+          setProductionSheets(normalizeResponse(response));
+        } else if (isTailor && userId) {
+          const response = await apiClient.get(
+            `/fichas-produccion/mis-fichas/${userId}`
+          );
+          setProductionSheets(normalizeResponse(response));
+        } else {
+          setProductionSheets([]);
+        }
+      } else {
+        setProductionSheets([]);
+      }
     } catch (err) {
       setError(
-        "No fue posible cargar la información. Revisa que el backend esté activo y que el usuario tenga permisos."
+        err.response?.data?.message ||
+          "No fue posible cargar la información. Revisa que el backend esté activo y que el usuario tenga permisos."
       );
     }
   };
@@ -119,6 +160,16 @@ function DashboardPage({ user, onLogout }) {
   const formatMoney = (value) => {
     if (value === null || value === undefined) return "$0";
     return `$${Number(value).toLocaleString("es-CO")}`;
+  };
+
+  const clearMessages = () => {
+    setError("");
+    setSuccessMessage("");
+  };
+
+  const handleSetActiveSection = (section) => {
+    clearMessages();
+    setActiveSection(section);
   };
 
   const renderDashboard = () => (
@@ -136,7 +187,7 @@ function DashboardPage({ user, onLogout }) {
           <article className="stat-card">
             <span>Productos</span>
             <h2>{products.length}</h2>
-            <p>Chaquetas activas registradas para venta o producción</p>
+            <p>Productos activos registrados para venta o producción</p>
           </article>
         )}
 
@@ -148,58 +199,48 @@ function DashboardPage({ user, onLogout }) {
           </article>
         )}
 
+        {canViewSupplies && (
+          <article className="stat-card">
+            <span>Insumos</span>
+            <h2>{supplies.length}</h2>
+            <p>Insumos disponibles para producción</p>
+          </article>
+        )}
+
+        {canViewStock && (
+          <article className="stat-card">
+            <span>Stock</span>
+            <h2>Local</h2>
+            <p>Consulta de disponibilidad por punto de venta</p>
+          </article>
+        )}
+
         {canViewSales && (
           <article className="stat-card">
             <span>Ventas</span>
-            <h2>Próximo</h2>
-            <p>Módulo preparado para el registro de ventas</p>
+            <h2>{sales.length}</h2>
+            <p>Ventas registradas en el sistema</p>
           </article>
         )}
 
         {canViewProduction && (
           <article className="stat-card">
             <span>Producción</span>
-            <h2>Próximo</h2>
-            <p>Gestión de fichas y reportes de producción</p>
+            <h2>{productionSheets.length}</h2>
+            <p>Fichas de producción disponibles</p>
           </article>
         )}
 
         {canViewAlerts && (
           <article className="stat-card">
             <span>Alertas</span>
-            <h2>Próximo</h2>
-            <p>Seguimiento de faltantes, stock bajo y producción</p>
+            <h2>{alerts.length}</h2>
+            <p>Alertas activas pendientes</p>
           </article>
         )}
       </section>
 
       <section className="tables-grid">
-        {canViewSuppliers && (
-          <article className="table-card">
-            <h3>Últimos proveedores</h3>
-
-            <table>
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Correo</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {suppliers.slice(0, 5).map((supplier) => (
-                  <tr key={supplier.id}>
-                    <td>{supplier.name || "Sin nombre"}</td>
-                    <td>{supplier.email || "Sin correo"}</td>
-                    <td>{supplier.status || "Sin estado"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </article>
-        )}
-
         {canViewProducts && (
           <article className="table-card">
             <h3>Últimos productos</h3>
@@ -214,6 +255,12 @@ function DashboardPage({ user, onLogout }) {
               </thead>
 
               <tbody>
+                {products.length === 0 && (
+                  <tr>
+                    <td colSpan="3">No hay productos disponibles.</td>
+                  </tr>
+                )}
+
                 {products.slice(0, 5).map((product) => (
                   <tr key={product.id}>
                     <td>{product.reference || "Sin referencia"}</td>
@@ -226,25 +273,100 @@ function DashboardPage({ user, onLogout }) {
           </article>
         )}
 
-        {canViewStores && (
+        {canViewSales && (
           <article className="table-card">
-            <h3>Últimos locales</h3>
+            <h3>Últimas ventas</h3>
 
             <table>
               <thead>
                 <tr>
-                  <th>Nombre</th>
-                  <th>Zona</th>
+                  <th>ID</th>
+                  <th>Local</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {sales.length === 0 && (
+                  <tr>
+                    <td colSpan="3">No hay ventas registradas.</td>
+                  </tr>
+                )}
+
+                {sales.slice(0, 5).map((sale) => (
+                  <tr key={sale.id}>
+                    <td>{sale.id}</td>
+                    <td>{sale.storeName || "Sin local"}</td>
+                    <td>{formatMoney(sale.totalAmount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </article>
+        )}
+
+        {canViewProduction && (
+          <article className="table-card">
+            <h3>Últimas fichas de producción</h3>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Título</th>
                   <th>Estado</th>
                 </tr>
               </thead>
 
               <tbody>
-                {stores.slice(0, 5).map((store) => (
-                  <tr key={store.id}>
-                    <td>{store.name || "Sin nombre"}</td>
-                    <td>{store.zone || "No registrada"}</td>
-                    <td>{store.status || "Sin estado"}</td>
+                {productionSheets.length === 0 && (
+                  <tr>
+                    <td colSpan="3">No hay fichas disponibles.</td>
+                  </tr>
+                )}
+
+                {productionSheets.slice(0, 5).map((sheet) => (
+                  <tr key={sheet.id}>
+                    <td>{sheet.id}</td>
+                    <td>{sheet.title || "Sin título"}</td>
+                    <td>{sheet.status || "Sin estado"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </article>
+        )}
+
+        {canViewAlerts && (
+          <article className="table-card">
+            <h3>Alertas activas</h3>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Mensaje</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {alerts.length === 0 && (
+                  <tr>
+                    <td colSpan="3">No hay alertas activas.</td>
+                  </tr>
+                )}
+
+                {alerts.slice(0, 5).map((alert) => (
+                  <tr key={alert.id}>
+                    <td>{alert.id}</td>
+                    <td>
+                      {alert.message ||
+                        alert.description ||
+                        alert.alertMessage ||
+                        "Sin mensaje"}
+                    </td>
+                    <td>{alert.status || "Sin estado"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -255,222 +377,129 @@ function DashboardPage({ user, onLogout }) {
     </>
   );
 
-  const renderSuppliers = () => (
-    <section className="section-card">
-      <h2>Proveedores</h2>
-      <p>Consulta de proveedores registrados en el sistema.</p>
-
-      <table>
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Teléfono</th>
-            <th>Correo</th>
-            <th>Dirección</th>
-            <th>Estado</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {suppliers.map((supplier) => (
-            <tr key={supplier.id}>
-              <td>{supplier.name || "Sin nombre"}</td>
-              <td>{supplier.phone || "No registrado"}</td>
-              <td>{supplier.email || "No registrado"}</td>
-              <td>{supplier.address || "No registrada"}</td>
-              <td>{supplier.status || "Sin estado"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
-  );
-
-  const renderProducts = () => (
-    <section className="section-card">
-      <h2>Productos</h2>
-      <p>Consulta de productos registrados para producción o venta.</p>
-
-      <table>
-        <thead>
-          <tr>
-            <th>Referencia</th>
-            <th>Nombre</th>
-            <th>Categoría</th>
-            <th>Talla</th>
-            <th>Color</th>
-            <th>Costo producción</th>
-            <th>Precio venta</th>
-            <th>Estado</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {products.map((product) => (
-            <tr key={product.id}>
-              <td>{product.reference || "Sin referencia"}</td>
-              <td>{product.name || "Sin nombre"}</td>
-              <td>{product.category || "Sin categoría"}</td>
-              <td>{product.size || "Sin talla"}</td>
-              <td>{product.color || "Sin color"}</td>
-              <td>{formatMoney(product.productionCost)}</td>
-              <td>{formatMoney(product.salePrice)}</td>
-              <td>{product.status || "Sin estado"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
-  );
-
-  const renderStores = () => (
-    <section className="section-card">
-      <h2>Locales</h2>
-      <p>Consulta de puntos de venta asociados al sistema.</p>
-
-      <table>
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Zona</th>
-            <th>Tipo</th>
-            <th>Dirección</th>
-            <th>Estado</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {stores.map((store) => (
-            <tr key={store.id}>
-              <td>{store.name || "Sin nombre"}</td>
-              <td>{store.zone || "No registrada"}</td>
-              <td>{store.type || "No registrado"}</td>
-              <td>{store.address || "No registrada"}</td>
-              <td>{store.status || "Sin estado"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
-  );
-
-  const renderComingSoon = (title, description) => (
-    <section className="section-card">
-      <h2>{title}</h2>
-      <p className="empty-state">{description}</p>
-    </section>
-  );
-
-  const renderUnauthorized = () => (
-    <section className="section-card">
-      <h2>Acceso no disponible</h2>
-      <p className="empty-state">
-        Este módulo no está disponible para el rol actual.
-      </p>
-    </section>
-  );
-
   const renderContent = () => {
-    if (activeSection === "dashboard") return renderDashboard();
+    if (activeSection === "dashboard") {
+      return renderDashboard();
+    }
 
     if (activeSection === "suppliers") {
-      return canViewSuppliers ? renderSuppliers() : renderUnauthorized();
+      return (
+        <SuppliersModule
+          suppliers={suppliers}
+          isAdmin={isAdmin}
+          reload={loadData}
+          setError={setError}
+          setSuccessMessage={setSuccessMessage}
+        />
+      );
     }
 
     if (activeSection === "products") {
-      return canViewProducts ? renderProducts() : renderUnauthorized();
+      return (
+        <ProductsModule
+          products={products}
+          isAdmin={isAdmin}
+          reload={loadData}
+          setError={setError}
+          setSuccessMessage={setSuccessMessage}
+        />
+      );
     }
 
     if (activeSection === "stores") {
-      return canViewStores ? renderStores() : renderUnauthorized();
+      return (
+        <StoresModule
+          stores={stores}
+          isAdmin={isAdmin}
+          reload={loadData}
+          setError={setError}
+          setSuccessMessage={setSuccessMessage}
+        />
+      );
+    }
+
+    if (activeSection === "supplies") {
+      return (
+        <SuppliesModule
+          supplies={supplies}
+          suppliers={suppliers}
+          isAdmin={isAdmin}
+          reload={loadData}
+          setError={setError}
+          setSuccessMessage={setSuccessMessage}
+        />
+      );
+    }
+
+    if (activeSection === "stock") {
+      return (
+        <StockModule
+          stores={stores}
+          products={products}
+          isAdmin={isAdmin}
+          reload={loadData}
+          setError={setError}
+          setSuccessMessage={setSuccessMessage}
+        />
+      );
     }
 
     if (activeSection === "sales") {
-      return canViewSales
-        ? renderComingSoon(
-            "Ventas",
-            "Módulo en construcción para registrar ventas y descontar stock local."
-          )
-        : renderUnauthorized();
+      return (
+        <SalesModule
+          sales={sales}
+          stores={stores}
+          products={products}
+          reload={loadData}
+          setError={setError}
+          setSuccessMessage={setSuccessMessage}
+        />
+      );
     }
 
     if (activeSection === "production") {
-      return canViewProduction
-        ? renderComingSoon(
-            "Producción",
-            "Módulo en construcción para consultar fichas de producción y reportar avances."
-          )
-        : renderUnauthorized();
+      return (
+        <ProductionModule
+          productionSheets={productionSheets}
+          products={products}
+          supplies={supplies}
+          user={user}
+          isAdmin={isAdmin}
+          isTailor={isTailor}
+          reload={loadData}
+          setError={setError}
+          setSuccessMessage={setSuccessMessage}
+        />
+      );
     }
 
     if (activeSection === "alerts") {
-      return canViewAlerts
-        ? renderComingSoon(
-            "Alertas",
-            "Módulo en construcción para consultar alertas de stock, producción y faltantes."
-          )
-        : renderUnauthorized();
+      return (
+        <AlertsModule
+          alerts={alerts}
+          reload={loadData}
+          setError={setError}
+          setSuccessMessage={setSuccessMessage}
+        />
+      );
     }
 
     return renderDashboard();
   };
 
   return (
-    <main className="dashboard-page">
-      <aside className="sidebar">
-        <div className="sidebar-logo">
-          <div className="brand-icon">G</div>
-
-          <div>
-            <h2>Groccy</h2>
-            <p>Panel empresarial</p>
-          </div>
-        </div>
-
-        <nav className="sidebar-menu">
-          {menuItems.map((item) => (
-            <button
-              key={item.key}
-              className={activeSection === item.key ? "active" : ""}
-              onClick={() => setActiveSection(item.key)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-
-        <button className="logout-button" onClick={onLogout}>
-          Cerrar sesión
-        </button>
-      </aside>
-
-      <section className="dashboard-content">
-        <header className="dashboard-header">
-          <div>
-            <h1>
-              {activeSection === "dashboard" && "Panel principal"}
-              {activeSection === "suppliers" && "Proveedores"}
-              {activeSection === "products" && "Productos"}
-              {activeSection === "stores" && "Locales"}
-              {activeSection === "sales" && "Ventas"}
-              {activeSection === "production" && "Producción"}
-              {activeSection === "alerts" && "Alertas"}
-            </h1>
-
-            <p>
-              Bienvenido/a, <strong>{user?.fullName || user?.email}</strong>. Rol actual:{" "}
-              <strong>{user?.role}</strong>
-            </p>
-          </div>
-
-          <button onClick={loadData}>Actualizar datos</button>
-        </header>
-
-        {error && <p className="dashboard-error">{error}</p>}
-
-        {renderContent()}
-      </section>
-    </main>
+    <DashboardLayout
+      user={user}
+      menuItems={menuItems}
+      activeSection={activeSection}
+      setActiveSection={handleSetActiveSection}
+      onLogout={onLogout}
+      onRefresh={loadData}
+      error={error}
+      successMessage={successMessage}
+    >
+      {renderContent()}
+    </DashboardLayout>
   );
 }
 
