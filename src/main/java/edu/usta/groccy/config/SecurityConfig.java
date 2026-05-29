@@ -132,6 +132,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/movimientos/**")
                         .hasRole("ADMIN")
 
+                        // Sales
+                        .requestMatchers(HttpMethod.GET, "/api/v1/ventas/**")
+                        .hasAnyRole("ADMIN", "SELLER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/ventas/**")
+                        .hasAnyRole("ADMIN", "SELLER")
+
                         // Any other endpoint requires authentication
                         .anyRequest().authenticated()
                 )
